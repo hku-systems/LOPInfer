@@ -1,5 +1,5 @@
 import sys
-from intraDP import intraDP
+from LOPInfer import LOPInfer
 
 if __name__ == '__main__':
     ip = "192.168.50.11"
@@ -12,6 +12,6 @@ if __name__ == '__main__':
         bandwidth_file_path = str(sys.argv[3])
     else:
         bandwidth_file_path = None
-    IDP = intraDP(parallel_approach="select",
+    LOPInf = LOPInfer(parallel_approach="select",
                                          ip=ip, port=port)
-    IDP.start_server(bandwidth_file_path=bandwidth_file_path)
+    LOPInf.start_server(bandwidth_file_path=bandwidth_file_path)

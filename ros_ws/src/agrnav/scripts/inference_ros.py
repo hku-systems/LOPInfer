@@ -10,7 +10,7 @@ argnav_dir = osp.join(project_dir, "third_parties", "AGRNav")
 perception_dir = osp.join(argnav_dir, "src", "perception")
 perception_sconet_dir = osp.join(perception_dir, "SCONet")
 sys.path.insert(0, osp.abspath(osp.join(osp.abspath(__file__), *[osp.pardir]*5)))
-from intraDP import intraDP
+from LOPInfer import LOPInfer
 sys.path.insert(0, perception_dir)
 sys.path.insert(0, perception_sconet_dir)
 import torch
@@ -105,10 +105,10 @@ def test(model, dset, _cfg, logger, out_path_root, coordinates_publisher):
                     ip = rospy.get_param("/server_ip", "127.0.0.1")
                     port = int(rospy.get_param("/server_port", 12345))
                     rospy.loginfo(f"offload_mode {offload_mode}")
-                    IDP = intraDP(offload, offload_method, ip=ip, port=port,
+                    LOPInf = LOPInfer(offload, offload_method, ip=ip, port=port,
                                                         constraint_latency=offload_mode=="SPSO-GA",
                                                         log=rospy.loginfo)
-                    IDP.start_client([data['3D_OCCUPANCY']], {}, model, 0, "eth0", os.environ["ROS_LOG_DIR"])
+                    LOPInf.start_client([data['3D_OCCUPANCY']], {}, model, 0, "eth0", os.environ["ROS_LOG_DIR"])
                     init = True
                 pred_semantic_1_1 = model(data['3D_OCCUPANCY'])
                 scores = {"pred_semantic_1_1": pred_semantic_1_1}

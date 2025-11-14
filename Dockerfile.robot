@@ -5,7 +5,7 @@ RUN apt-get install -y vim git
 RUN DEBIAN_FRONTEND=oninteractive apt-get install -y wget unzip
 RUN python3 -m pip install --upgrade pip
 
-# IDP
+# LOPInf
 RUN pip3 install wheel --force-reinstall
 RUN pip3 install setuptools --force-reinstall
 RUN pip install dill pymaxflow

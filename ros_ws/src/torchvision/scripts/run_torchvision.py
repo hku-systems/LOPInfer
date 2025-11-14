@@ -85,11 +85,11 @@ if __name__ == "__main__":
     offload = rospy.get_param("/offload", True)
     offload_method = rospy.get_param("/offload_method", "all")
 
-    from intraDP import intraDP, VideoFrameDataset
+    from LOPInfer import LOPInfer, VideoFrameDataset
     offload_mode = rospy.get_param("/offload_mode", "DSCCS")
     ip = rospy.get_param("/server_ip", "127.0.0.1")
     port = rospy.get_param("/server_port", "12345")
-    IDP = intraDP(offload=offload,
+    LOPInf = LOPInfer(offload=offload,
                                             parallel_approach=offload_method,
                                             ip=ip, port=port,
                                             constraint_latency=offload_mode=="SPSO-GA",
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         inp = inp.to(device)
         while True:
             if idx == 0:
-                IDP.start_client([inp], {}, model, 0, "eth0", log_dir)
+                LOPInf.start_client([inp], {}, model, 0, "eth0", log_dir)
             pred = model(inp)
             # result = weights.meta['categories'][torch.argmax(pred[0])]
             # if result in dataset.classes[target]:

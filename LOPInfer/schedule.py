@@ -153,7 +153,7 @@ class ops_info:
         self.dim_size = []
         self.masked = []
         self.excluded = []
-        self.intraDP_layers: np.ndarray = []
+        self.LOPInfer_layers: np.ndarray = []
         self.barrier = []
         self.local_dim = []
         self.align_shape = []
@@ -228,14 +228,14 @@ class ops_info:
                         if dim < len(shape):
                             can_mix = max(can_mix, shape[dim] > 2)
                 else:
-                    can_mix = np.any([self.intraDP_layers[i] for i in server_profile.input_from])
+                    can_mix = np.any([self.LOPInfer_layers[i] for i in server_profile.input_from])
             else:
                 can_mix = False
             if can_mix:
-                self.intraDP_layers.append(server_profile.local_dim is not None)
+                self.LOPInfer_layers.append(server_profile.local_dim is not None)
             else:
-                self.intraDP_layers.append(False)
-            # self.intraDP_layers.append(not robot_profile.hook_kwargs["barrier"])
+                self.LOPInfer_layers.append(False)
+            # self.LOPInfer_layers.append(not robot_profile.hook_kwargs["barrier"])
             self.barrier.append(server_profile.local_dim is not None)
             if "align_shape" in server_profile.hook_kwargs and server_profile.hook_kwargs["align_shape"]:
                 self.align_shape.append(True)
@@ -246,7 +246,7 @@ class ops_info:
         self.transmit_data = np.array(self.transmit_data)
         self.ops_num = len(robot_profile_result.profile)
         self.barrier = np.array(self.barrier)
-        self.intraDP_layers = np.array(self.intraDP_layers)
+        self.LOPInfer_layers = np.array(self.LOPInfer_layers)
         self.conv = np.array(self.conv)
         self.kernel_size = np.array(self.kernel_size)
         self.dim_size = np.array(self.dim_size)
@@ -285,7 +285,7 @@ class Graph:
         # print(f"min_cut_plan {min_cut_plan} with value {max_flow_value}")
         return max_flow_value, min_cut_plan
 
-class IDP_scheduler:
+class LOPInf_scheduler:
     def __init__(self, parallel_approach = "all", required_latency = -1.) -> None:
         self.parallel_approach = parallel_approach
         self.robot_ops = None
@@ -315,12 +315,12 @@ class IDP_scheduler:
         self.server_cat_cost_time = 0.
         self.profiles: List[TorchOPProfile] = None
         
-        # intraDP
+        # LOPInfer
         self.random_times = 50
         self.min_threshold = 1e-02
-        self.intraDP_result_x = None
-        self.intraDP_estimated_time = None
-        self.intraDP_estimated_time = float("inf")
+        self.LOPInfer_result_x = None
+        self.LOPInfer_estimated_time = None
+        self.LOPInfer_estimated_time = float("inf")
         np.random.seed(42)
     
     def estimate_transmission_time(self, transmit_data, bandwidth,place):
@@ -760,7 +760,7 @@ class IDP_scheduler:
                 parent = self.info.dependency[i][1][0]
                 if len(self.info.dependency[parent][2]) == 1:
                     #only one child
-                    if self.info.intraDP_layers[parent] == self.info.intraDP_layers[i]:
+                    if self.info.LOPInfer_layers[parent] == self.info.LOPInfer_layers[i]:
                         if self.info.transmit_data[i] < last_transmit_data[parent]:
                             self.x_for_ops[i] = idx
                             idx += 1
@@ -790,7 +790,7 @@ class IDP_scheduler:
                 last_transmit_data = self.info.transmit_data[i]
 
         self.x_num = idx
-        # print(f"intraDP layers {self.info.intraDP_layers}")
+        # print(f"LOPInfer layers {self.info.LOPInfer_layers}")
         # print(f"x num {self.x_num}")
         # print(f"x for ops {self.x_for_ops}")
 
@@ -801,17 +801,17 @@ class IDP_scheduler:
             parent = self.info.dependency[idx][1][0]
             if len(self.info.dependency[parent][2]) == 1:
                 #only one child
-                not_barrier = self.info.intraDP_layers[idx]
+                not_barrier = self.info.LOPInfer_layers[idx]
             else:
                 # multi child, 只要有一个child强同步，全部child强同步
                 not_barrier = True 
                 for each in self.info.dependency[parent][2]:
-                    if self.info.intraDP_layers[each] is False:
+                    if self.info.LOPInfer_layers[each] is False:
                         not_barrier = False
                         break
         else:
             # multi parent
-            not_barrier = self.info.intraDP_layers[idx]
+            not_barrier = self.info.LOPInfer_layers[idx]
         
         if not_barrier:
             if x < self.min_threshold:
@@ -833,7 +833,7 @@ class IDP_scheduler:
         return offset
 
     
-    def transfer_robot_rate_to_intraDP_plan(self,bandwidth):
+    def transfer_robot_rate_to_LOPInfer_plan(self,bandwidth):
         # for client
         client_skip_plan = [False for _ in range(self.info.ops_num)]
 
@@ -868,14 +868,14 @@ class IDP_scheduler:
                 current_robot_rate = 1.
             else:
                 x_idx = self.x_for_ops[i]
-                current_robot_rate = self.get_actual_robot_rate(self.intraDP_result_x[x_idx],i)
+                current_robot_rate = self.get_actual_robot_rate(self.LOPInfer_result_x[x_idx],i)
             current_idx = int(self.info.output_shapes[i][0][-1] * current_robot_rate)
             
             if i == self.info.ops_num -1:
                 next_robot_rate = 1.
             else:
                 x_idx = self.x_for_ops[self.info.dependency[i][2][0]]
-                next_robot_rate = self.get_actual_robot_rate(self.intraDP_result_x[x_idx],self.info.dependency[i][2][0])
+                next_robot_rate = self.get_actual_robot_rate(self.LOPInfer_result_x[x_idx],self.info.dependency[i][2][0])
             next_idx = int(self.info.output_shapes[i][0][-1] * next_robot_rate)
             
             client_time += current_robot_rate*self.info.robot_ops_time[i]
@@ -959,7 +959,7 @@ class IDP_scheduler:
         _, unique_index, inverse = np.unique(x_idx, return_index=True, return_inverse=True)
         return client_plan, server_plan
 
-    def generate_intraDP_plan_2(self, bandwidth, partial_steps=3, linspace_num=11, bandwidth_degrade=0.9):
+    def generate_LOPInfer_plan_2(self, bandwidth, partial_steps=3, linspace_num=11, bandwidth_degrade=0.9):
         # mincut schdule
         x_idx = []
         for idx, input_from, _ in self.info.dependency:
@@ -1321,8 +1321,8 @@ class IDP_scheduler:
 
         return client_plan, server_plan
 
-    def generate_intraDP_plan_3(self, bandwidth, max_possible_poses_number = 3):
-        # use min-cut to find possible poses, no diff to intraDP
+    def generate_LOPInfer_plan_3(self, bandwidth, max_possible_poses_number = 3):
+        # use min-cut to find possible poses, no diff to LOPInfer
         num_nodes = self.info.ops_num
         for node in self.info.dependency:
             if len(node[2]) > 1:
@@ -1844,7 +1844,7 @@ class IDP_scheduler:
         
         return client_plan, server_plan
 
-    def generate_intraDP_plan(self,bandwidth):
+    def generate_LOPInfer_plan(self,bandwidth):
         if self.x_for_ops is None:
             self.allocate_x_for_ops()
 
@@ -1900,18 +1900,18 @@ class IDP_scheduler:
         for i in range(self.random_times):
             x0 = np.random.uniform(0., 1., size=self.x_num)
             result = optimize.minimize(objective_function,x0,constraints = constraints, args=(bandwidth,))
-            if self.intraDP_estimated_time > result.fun:
-                self.intraDP_estimated_time = result.fun
-                self.intraDP_result_x = result.x
+            if self.LOPInfer_estimated_time > result.fun:
+                self.LOPInfer_estimated_time = result.fun
+                self.LOPInfer_result_x = result.x
 
         # global solver differential_evolution
         ranges = [(0., 1.) for _ in range(self.x_num)]
         result = optimize.differential_evolution(objective_function, ranges, args=(bandwidth,))
-        if self.intraDP_estimated_time > result.fun:
-            self.intraDP_estimated_time = result.fun
-            self.intraDP_result_x = result.x
+        if self.LOPInfer_estimated_time > result.fun:
+            self.LOPInfer_estimated_time = result.fun
+            self.LOPInfer_result_x = result.x
         
-        return self.transfer_robot_rate_to_intraDP_plan(bandwidth)   
+        return self.transfer_robot_rate_to_LOPInfer_plan(bandwidth)   
 
     def generate_plan(self, bandwidth):
         if self.parallel_approach == "select" or self.parallel_approach in ["SPSO-GA", "DSCCS"]:
@@ -1928,12 +1928,12 @@ class IDP_scheduler:
             server_plan = self.transfer_client_plan_to_server_plan(client_plan)
         elif self.parallel_approach == "tp":
             client_plan, server_plan = self.generate_tp_plan(bandwidth)
-        elif self.parallel_approach == "intraDP1":
-            client_plan, server_plan = self.generate_intraDP_plan(bandwidth)
-        elif self.parallel_approach == "intraDP":
-            client_plan, server_plan = self.generate_intraDP_plan_2(bandwidth)
-        elif self.parallel_approach == "intraDP3":
-            client_plan, server_plan = self.generate_intraDP_plan_3(bandwidth)
+        elif self.parallel_approach == "LOPInfer1":
+            client_plan, server_plan = self.generate_LOPInfer_plan(bandwidth)
+        elif self.parallel_approach == "LOPInfer":
+            client_plan, server_plan = self.generate_LOPInfer_plan_2(bandwidth)
+        elif self.parallel_approach == "LOPInfer3":
+            client_plan, server_plan = self.generate_LOPInfer_plan_3(bandwidth)
         for plan in [client_plan, server_plan]:
             if "align_shape" not in plan:
                 plan["align_shape"] = np.zeros_like(plan["skip"])

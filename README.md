@@ -1,13 +1,15 @@
-# Intra-DP: A High Performance Collaborative Inference System for Mobile Edge Computing
+# LOPInfer: A High-Performance Local-Operator Parallel Inference System for Service Workloads in Mobile Edge Computing
 
-Intra-DP is a high-performance distributed inference system optimized for DNN inference on mobile edge computing. 
-Intra-DP employs a novel parallel computing technique based on local operators (i.e., operators whose minimum unit input is not the entire input tensor, such as the convolution kernel). 
-By cutting their operations into several independent sub-operations and overlapping the computation and transmission of different sub-operations through parallel execution, Intra-DP significantly mitigates transmission bottlenecks in mobile edge computing, achieving fast and energyefficient inference.
 
-We put Intra-DP to the test on our real-world robot, evaluating its performance in two typical real-world robotic applications: [KAPAO](https://github.com/wmcnally/kapao) and [AGRNav](https://github.com/jmwang0117/AGRNav) (as shown in `kapao-demo.mp4` and `agrnav-demo.mp4`). Additionally, we assessed Intra-DP's effectiveness on several models implemented in Torchvision (you can find these in `./ros_ws/src/torchvision/scripts/run_torchvision.py`).
+LOPInfer is a local-operator parallel inference system for MEC service workloads that enables fine-grained overlap of computation and transmission within a single inference. 
+LOPInfer exploits local operators (i.e., operators whose computation can proceed on partial inputs rather than the entire input tensor), decomposes their computation (operation) into independent sub-operations.
+By pipelining intra-layer and cross-layer sub-operations, LOPInfer reduces idle time, hides transmission delay, and thereby shortens end-to-end inference latency and lowers device energy consumption without altering the DNN’s semantics. 
+
+
+We put LOPInfer to the test on our real-world robot, evaluating its performance in two typical real-world robotic applications: [KAPAO](https://github.com/wmcnally/kapao) and [AGRNav](https://github.com/jmwang0117/AGRNav) (as shown in `kapao-demo.mp4` and `agrnav-demo.mp4`). Additionally, we assessed LOPInfer's effectiveness on several models implemented in Torchvision (you can find these in `./ros_ws/src/torchvision/scripts/run_torchvision.py`).
 
 To make it easier for you to explore and understand our work, we've organized our codebase as follows:
-- The source code for Intra-DP is located in the `intraDP` folder.
+- The source code for LOPInfer is located in the `LOPInfer` folder.
 - The scripts we used in our experiments can be found in the `exp_utils` folder.
 - The relevant code for our workloads is placed in the `ros_ws` folder and two submodules of `KAPAO` and `AGRNav` in `third_parties`.
 - We've also included some examples of our experiment logs in the `log` folder, giving you a glimpse into our experiment process.
@@ -25,7 +27,7 @@ bash run_docker.sh
 ```
 Note that `Dockerfile.ros_robot` is a special version of dockerfile for our robot hardware, as KAPAO and AGRNav needs to control the movement of the robot via ROS.
 
-3. Install the dependency packages and intraDP in the docker containers on both the server and robot sides:
+3. Install the dependency packages and LOPInfer in the docker containers on both the server and robot sides:
 ```
 pip install -r requirement.txt
 python setup.py install
@@ -33,30 +35,30 @@ python setup.py install
 
 
 ## How to Use?
-1. Integrate Intra-DP into your existing applications, requiring only three lines of code. 
-For instance, applying Intra-DP to a VGG19 model is shown as follows, where ``192.168.50.1'' is the IP address of the GPU server.
+1. Integrate LOPInfer into your existing applications, requiring only three lines of code. 
+For instance, applying LOPInfer to a VGG19 model is shown as follows, where ``192.168.50.1'' is the IP address of the GPU server.
 
 ```python
-# Import package of Intra-DP
-import intraDP
+# Import package of LOPInfer
+import LOPInfer
 # Define a VGG19 model as usual
 vgg19 = VGG19().to(device)
-# Apply Intra-DP
-IDP = intraDP(ip = "192.168.50.1")
-IDP.start_client(model = vgg19)
+# Apply LOPInfer
+LOPInf = LOPInfer(ip = "192.168.50.1")
+LOPInf.start_client(model = vgg19)
 # Run model for inference as usual
 result = vgg19(input)
 ```
 The corresponding modifications to our workload's source code, which are conveniently provided in the `ros_ws` folder.
 
-2. To get started, simply run the following script on your GPU server to launch the Intra-DP server:
+2. To get started, simply run the following script on your GPU server to launch the LOPInfer server:
 ```
 python exp_utils/start_server.py #on GPU server
 ```
 
-It's essential to ensure that the Intra-DP client and server can communicate seamlessly, so please double-check the parameters on the GPU server side before running your application.
+It's essential to ensure that the LOPInfer client and server can communicate seamlessly, so please double-check the parameters on the GPU server side before running your application.
 
-3. Once the Intra-DP server is up and running, you can start model inference on your mobile devices as usual via the Intra-DP client.
+3. Once the LOPInfer server is up and running, you can start model inference on your mobile devices as usual via the LOPInfer client.
 
 ```
 python ./ros_ws/src/torchvision/scripts/run_torchvision.py #on robot

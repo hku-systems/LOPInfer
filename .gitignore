@@ -1,4 +1,4 @@
-/intraDP.egg-info
+/LOPInfer.egg-info
 **/*.egg-info
 **/build
 **/dist
@@ -16,4 +16,4 @@
 **/*.pth
 **/raw_data/
 **/_*
-*.intraDP_plan
+*.LOPInfer_plan

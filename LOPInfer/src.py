@@ -28,7 +28,7 @@ from .slice_hook import hook_model, slice_forward, CustomIdentity, profile_ops_t
 from .bm_socket import BiDirectionalSocket
 from .recursive_pickle_obj import recur_dump_obj
 from ._utils import iterate_tensor, iterate_all_close, log_dur
-from .schedule import IDP_scheduler
+from .schedule import LOPInf_scheduler
 from .profile_pickle import profile_pickle
 from .estimate_bandwidth import init_bandwidth_monitor
 from .estimate_power_consumption import init_power_monitor
@@ -40,7 +40,7 @@ from .limit_bandwidth import start_replay_bandwidth
 # print(f"{torch.cuda.memory_allocated()} {torch.cuda.max_memory_allocated()}")
 
 empty_preamble = b"0"*int(1024*1024*0.5) # 0.5MB
-class intraDP:
+class LOPInfer:
     def __init__(self, offload=True,  parallel_approach = "select",
                 ip="127.0.0.1", port=12345, ctrl_port=12346, debug=False,
                 constraint_latency=False, log=print) -> None:
@@ -114,7 +114,7 @@ class intraDP:
 
     def start_server(self, bandwidth_file_path):
         self.role = "server"
-        self.log(f"starting intraDP server on {self.server_ip}:{self.server_port}")
+        self.log(f"starting LOPInfer server on {self.server_ip}:{self.server_port}")
         torch.set_grad_enabled(False)
         sock = BiDirectionalSocket(address=self.server_ip, port=self.server_port, mode="server", log=self.log)
         assert sock.receive_message() == "Examinining connection..."
@@ -174,13 +174,13 @@ class intraDP:
 
         if role == "client":
             parallel_approach = self.parallel_approach
-            scheduler = IDP_scheduler(parallel_approach)
+            scheduler = LOPInf_scheduler(parallel_approach)
             sock.send_message(parallel_approach)
         else:
             parallel_approach = sock.receive_message()
             self.parallel_approach = parallel_approach
-            scheduler = IDP_scheduler(parallel_approach)
-        if "intraDP" in parallel_approach:
+            scheduler = LOPInf_scheduler(parallel_approach)
+        if "LOPInfer" in parallel_approach:
             self.debug = True   # TODO
 
         @torch.no_grad()
@@ -257,7 +257,7 @@ class intraDP:
             # try to sleep for every 10ms
             log(f"total {len(profile_result.profile)} ops (filtered from {orig_ops_num} ops); time {sum(p.ops_time for p in profile_result.profile.values()):.4f}s (aligned by {factor:.4f}\n")
 
-            if "intraDP" in parallel_approach:
+            if "LOPInfer" in parallel_approach:
                 if role == "client":
                     sock.send_message({"ops": profile_result.copy_for_transmission(),
                                     "constraint_latency": self.constraint_latency,
@@ -277,8 +277,8 @@ class intraDP:
                     profile_result.client_comp_time = client_comp_time
                     profile_result.server_comp_time = profile_result.local_comp_time
                     store_plan_path = None
-                    if "intraDP" in parallel_approach:
-                        store_plan_path = f"intraDP_plan_{model_hash}.pkl"
+                    if "LOPInfer" in parallel_approach:
+                        store_plan_path = f"LOPInfer_plan_{model_hash}.pkl"
                     elif "select" in parallel_approach:
                         if constraint_latency:
                             store_plan_path = f"select_constraint_latency_plan_{model_hash}_constraint.pkl"
@@ -303,8 +303,8 @@ class intraDP:
 
                     sock.send_message([scheduler.client_plans, profile_result.server_comp_time])
                     scheduler.recv_plan(scheduler.server_plans)  # Server does not output
-                    self.log(f"Number of local ops {scheduler.info.intraDP_layers.sum()}")
-                    self.log(f"Number of global ops {~(scheduler.info.intraDP_layers).sum()}")
+                    self.log(f"Number of local ops {scheduler.info.LOPInfer_layers.sum()}")
+                    self.log(f"Number of global ops {~(scheduler.info.LOPInfer_layers).sum()}")
                 self.log("--------------------------------")
                 self.log(f"offload recv plan: ")
                 for bw in range(0, scheduler.max_bw):

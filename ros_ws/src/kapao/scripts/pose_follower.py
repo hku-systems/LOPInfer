@@ -188,13 +188,13 @@ class CompNavigation():
 
         stride = int(model.stride.max())  # model stride
         imgsz = check_img_size(args.imgsz, s=stride)  # check image size
-        from intraDP import intraDP
+        from LOPInfer import LOPInfer
         rospy.loginfo('Using device: {}'.format(device))
         rospy.loginfo("Model initialization finished.")
         offload_mode = rospy.get_param("/offload_mode", "DSCCS")
         ip = rospy.get_param("/server_ip", "127.0.0.1")
         port = rospy.get_param("/server_port", "12345")
-        IDP = intraDP(offload, offload_method, ip, port,
+        LOPInf = LOPInfer(offload, offload_method, ip, port,
                                                 constraint_latency=offload_mode=="SPSO-GA",
                                                 log=rospy.loginfo)
 
@@ -230,7 +230,7 @@ class CompNavigation():
             # img = img / 255.  # 0 - 255 to 0.0 - 1.0
 
             if count == 0:
-                IDP.start_client([img, data], {"augment": True, "kp_flip": data['kp_flip'], "scales": data['scales'], "flips": data['flips']}, model, 2, "eth0", log_dir)
+                LOPInf.start_client([img, data], {"augment": True, "kp_flip": data['kp_flip'], "scales": data['scales'], "flips": data['flips']}, model, 2, "eth0", log_dir)
             person_dets, kp_dets = model(img, data, augment=True, kp_flip=data['kp_flip'], scales=data['scales'], flips=data['flips'])
 
             if not self.ready1.is_set():

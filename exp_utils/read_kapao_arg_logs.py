@@ -368,7 +368,7 @@ def move_legend(ax, new_loc, **kws):
     title = old_legend.get_title().get_text()
     ax.legend(handles, labels, loc=new_loc, title=title, **kws)
 
-mode_to_baseline = {"flex": "SPSO-GA", "fix": "DSCCS" , "Local": "Local", "mixed2": "Intra-DP"}
+mode_to_baseline = {"flex": "SPSO-GA", "fix": "DSCCS" , "Local": "Local", "mixed2": "LOPInfer"}
 sns.set_context("poster")
 sns.set_style(style="whitegrid")
 sns.set_color_codes(palette="deep")
